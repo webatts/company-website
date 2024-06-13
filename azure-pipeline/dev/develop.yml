@@ -15,7 +15,7 @@ steps:
     npm install
     npm run build
     ls -la
-    ls dist
+    mv dist build
     cp -r nginx-conf/react.conf build/ docker/dev
     ls docker/dev
   displayName: 'Install and Build'
