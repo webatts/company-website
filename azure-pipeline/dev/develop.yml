@@ -1,0 +1,97 @@
+trigger:
+  - main
+pool:
+  vmImage: 'ubuntu-latest'
+
+
+steps:
+- task: NodeTool@0
+  inputs:
+    versionSpec: '16.x'
+  displayName: 'Install Node.js'
+
+- script: |
+    npm --version
+    npm install
+    npm run build
+    ls -la
+    mv dist build
+    cp -r nginx-conf/react.conf build/ docker/dev
+    ls docker/dev
+  displayName: 'Install and Build'
+
+
+- task: Docker@2
+  displayName: Login to ACR
+  inputs:
+    command: login
+    containerRegistry: HubApp
+
+- task: Docker@2
+  displayName: Build and Push
+  inputs:
+    command: buildAndPush
+    dockerfile: docker/dev/Dockerfile
+    repository: mock-fe # username/contosoRepository for DockerHub
+    tags: |
+      $(Build.SourceBranchName)-$(Build.BuildId)
+
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    artifactName: 'drop'
+    publishLocation: 'HubApp'
+
+
+- task: AzureCLI@2
+  displayName: 'Azure CLI Login'
+  inputs:
+    azureSubscription: HubApp-cli # Use your Azure service connection here
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: 'az account show'
+
+- task: AzureContainerApps@1
+  inputs:
+    azureSubscription: 'HubApp-cli'
+    containerAppName: 'mock-fe'
+    resourceGroup: 'HubApp'
+    imageToDeploy: 'hubapp.azurecr.io/mock-fe:$(Build.SourceBranchName)-$(Build.BuildId)'
+
+- script: |
+    COMMIT_MESSAGE=$(git log -1 --pretty=format:"%s")
+    COMMIT_AUTHOR=$(git log -1 --pretty=format:"%an")
+    echo $COMMIT_MESSAGE
+    #curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"Deploy To DEV\n\tTriggered by: $(Build.RequestedFor)-$COMMIT_AUTHOR\n\tCommit Details: $COMMIT_MESSAGE\n\tCommit ID: https://github.com/webatts/p2p-payments-fe/commit/$(Build.SourceVersion)\n\tTarget Application: https://devclient.inzo.co/\"}" https://hooks.slack.com/services/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
+    curl -X POST -H 'Content-type: application/json' --data "{
+          \"text\": \"Deploy To market-fe (Develop)\",
+          \"attachments\": [
+            {
+              \"fallback\": \"Commit Details\",
+              \"text\":  \"This commit Triggered by: ${COMMIT_AUTHOR}\",
+              \"fields\": [
+                {
+                  \"title\": \"Commit URL\",
+                  \"value\": \"<https://github.com/webatts/p2p-market-fe/commit/$(Build.SourceVersion)|Click here for commit details>\"
+                },
+                {
+                  \"title\": \"Commit Details\",
+                  \"value\": \"<https://github.com/webatts/p2p-market-fe/commit/$(Build.SourceVersion)|${COMMIT_MESSAGE}>\"
+                },
+                {
+                  \"title\": \"Commit Author\",
+                  \"value\": \"${COMMIT_AUTHOR}\"
+                },
+                {
+                  \"title\": \"Target Application\",
+                  \"value\": \"<https://market-fe.bravestone-66be93d4.uksouth.azurecontainerapps.io/|Click here to INZO-CLIENT>\"
+                }
+              ]
+            }
+          ]
+        }" https://hooks.slack.com/services/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
+
+  displayName: 'Sent Channel Notification'
+
+pr: none
