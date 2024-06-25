@@ -7,11 +7,56 @@ import { TermsAndCondtions } from '../components/TermsConditions';
 
 const { Title, Paragraph } = Typography;
 
+type TraddingAccount = {
+  number: string;
+  group: string;
+  platform: string & {
+    type: string
+  };
+}
+type PayLoad = {
+  userInfo: {
+    firstName: string,
+    lastName: string,
+    email: string,
+    phone: string,
+    active: boolean,
+    country: string,
+    language: string,
+    fullName: string,
+    kycApproved: boolean
+    },
+    tradingAccounts: TraddingAccount[];
+    termsAccepted:boolean;
+    transaction:{
+        id : number;
+        currency: string;
+        amount: number;
+    }
+}
+
 const Landing: React.FC = () => {
 
   const [showTerms, setShowTerms] = React.useState(false);
   const [acceptTerms, setAccetTerms] = React.useState(false);
 
+  const getPayload = (): PayLoad => {
+    return {
+      userInfo: getUserInfo().data.userInfo,
+      tradingAccounts: getUserInfo().data.trading.map((account: TraddingAccount) => { 
+        return  {  
+           number: account.number,
+           group: account.group,
+           platform: account.platform.type,
+    }}),
+      termsAccepted:acceptTerms,
+      transaction:{
+        id : 123,
+        currency: 'USD',
+        amount: 100,
+        }
+    }
+  }
   const redirectUser = () => {
     const customHeaders = {
       "API_KEY": import.meta.env.VITE_API_KEY,
@@ -20,8 +65,7 @@ const Landing: React.FC = () => {
     
     axios
     .post(`https://wallets-feature-be.mangomoss-3595ef97.uksouth.azurecontainerapps.io/api/p2p/connect`, {
-      ...getUserInfo().data,
-      termsAccepted: acceptTerms
+      ...getPayload(),
     }, {
       headers: { 
        ...customHeaders
@@ -29,7 +73,7 @@ const Landing: React.FC = () => {
     })
     .then((res) => {
       const userData = res.data;
-      window.location.replace(`${userData.landingUrl}?redirectToken=${userData.redirectToken}`)
+      // window.location.replace(`${userData.landingUrl}?redirectToken=${userData.redirectToken}`)
     })
     .catch((err) => {
       if (err.response?.data.code === 2043) {
