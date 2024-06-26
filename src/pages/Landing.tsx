@@ -73,7 +73,7 @@ const Landing: React.FC = () => {
     })
     .then((res) => {
       const userData = res.data;
-      // window.location.replace(`${userData.landingUrl}?redirectToken=${userData.redirectToken}`)
+       window.location.replace(`${userData.landingUrl}?redirectToken=${userData.redirectToken}`)
     })
     .catch((err) => {
       if (err.response?.data.code === 2043) {
